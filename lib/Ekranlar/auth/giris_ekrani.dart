@@ -13,8 +13,23 @@ class GirisEkrani extends StatefulWidget {
 class _GirisEkraniState extends State<GirisEkrani> {
   final _emailController = TextEditingController();
   final _sifreController = TextEditingController();
+  bool _yukleniyor = false;
 
   void girisYap() async {
+    if (_emailController.text.isEmpty || _sifreController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Lütfen tüm alanları doldurun."),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _yukleniyor = true;
+    });
+
     try {
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
@@ -27,7 +42,7 @@ class _GirisEkraniState extends State<GirisEkrani> {
           'kullanici_id': user.uid,
           'islem': 'Kullanıcı Giriş Yaptı',
           'tarih': FieldValue.serverTimestamp(),
-        }); // [cite: 22]
+        });
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -36,38 +51,183 @@ class _GirisEkraniState extends State<GirisEkrani> {
           backgroundColor: Colors.red,
         ),
       );
+    } finally {
+      if (mounted)
+        setState(() {
+          _yukleniyor = false;
+        });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Drone Kiralama - Giriş")),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            TextField(
-              controller: _emailController,
-              decoration: const InputDecoration(labelText: "E-posta"),
-            ),
-            TextField(
-              controller: _sifreController,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: "Şifre"),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(onPressed: girisYap, child: const Text("Giriş Yap")),
-            TextButton(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const KayitEkrani()),
+      // Resmin klavye açılınca yukarı kayıp bozulmasını engelliyor
+      resizeToAvoidBottomInset: false,
+      body: Stack(
+        children: [
+          Container(
+            decoration: const BoxDecoration(
+              image: DecorationImage(
+                //Giriş ekranının arka plan resminin internet üzerinden çekilmesi
+                image: NetworkImage(
+                  'https://png.pngtree.com/thumb_back/fh260/background/20210129/pngtree-blue-sky-and-sunshine-image_548401.jpg',
+                ),
+                fit: BoxFit.cover,
               ),
-              child: const Text("Hesabın yok mu? Kayıt Ol"),
             ),
-          ],
-        ),
+          ),
+          Container(color: Colors.black.withOpacity(0.3)),
+
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24.0),
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: Card(
+                    // Kartı hafif şeffaf yaparak arkadaki resmin biraz görünür hale getiriyor
+                    color: Colors.white.withOpacity(0.92),
+                    elevation: 12,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(32.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircleAvatar(
+                            radius: 35,
+                            backgroundColor: Colors.blue.shade50,
+                            child: const Icon(
+                              Icons.flight_takeoff,
+                              size: 40,
+                              color: Colors.blue,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          const Text(
+                            "Dronium",
+                            style: TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            "Devam etmek için giriş yapın",
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 30),
+
+                          // E-POSTA ALANI
+                          TextField(
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration: InputDecoration(
+                              labelText: "E-posta",
+                              prefixIcon: const Icon(Icons.email_outlined),
+                              filled: true,
+                              fillColor: Colors.white,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide(
+                                  color: Colors.grey.shade300,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // ŞİFRE ALANI
+                          TextField(
+                            controller: _sifreController,
+                            obscureText: true,
+                            decoration: InputDecoration(
+                              labelText: "Şifre",
+                              prefixIcon: const Icon(Icons.lock_outline),
+                              filled: true,
+                              fillColor: Colors.white,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide(
+                                  color: Colors.grey.shade300,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+
+                          // GİRİŞ BUTONU
+                          SizedBox(
+                            width: double.infinity,
+                            height: 52,
+                            child: ElevatedButton(
+                              onPressed: _yukleniyor ? null : girisYap,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue.shade600,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                elevation: 3,
+                              ),
+                              child: _yukleniyor
+                                  ? const CircularProgressIndicator(
+                                      color: Colors.white,
+                                    )
+                                  : const Text(
+                                      "Giriş Yap",
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // KAYIT OLMAYA YÖNLENDİRME
+                          TextButton(
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const KayitEkrani(),
+                              ),
+                            ),
+                            child: RichText(
+                              text: TextSpan(
+                                style: TextStyle(
+                                  color: Colors.grey.shade700,
+                                  fontSize: 14,
+                                ),
+                                children: const [
+                                  TextSpan(text: "Hesabın yok mu? "),
+                                  TextSpan(
+                                    text: "Kayıt Ol",
+                                    style: TextStyle(
+                                      color: Colors.blue,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

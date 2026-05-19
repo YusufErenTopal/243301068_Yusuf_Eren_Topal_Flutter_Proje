@@ -12,9 +12,24 @@ class KayitEkrani extends StatefulWidget {
 class _KayitEkraniState extends State<KayitEkrani> {
   final _emailController = TextEditingController();
   final _sifreController = TextEditingController();
-  String _secilenRol = 'Müşteri'; // [cite: 14]
+  String _secilenRol = 'Müşteri'; // Varsayılan rolümüz
+  bool _yukleniyor = false;
 
   void kayitOl() async {
+    if (_emailController.text.isEmpty || _sifreController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Lütfen tüm alanları doldurun."),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _yukleniyor = true;
+    });
+
     try {
       UserCredential userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(
@@ -22,73 +37,233 @@ class _KayitEkraniState extends State<KayitEkrani> {
             password: _sifreController.text.trim(),
           );
 
-      await FirebaseFirestore.instance
-          .collection('kullanicilar')
-          .doc(userCredential.user!.uid)
-          .set({
-            'email': _emailController.text.trim(),
-            'rol': _secilenRol,
-            'kayit_tarihi': FieldValue.serverTimestamp(),
-          });
+      if (userCredential.user != null) {
+        await FirebaseFirestore.instance
+            .collection('kullanicilar')
+            .doc(userCredential.user!.uid)
+            .set({
+              'email': _emailController.text.trim(),
+              'rol': _secilenRol,
+              'kayit_tarihi': FieldValue.serverTimestamp(),
+            });
 
-      await FirebaseFirestore.instance.collection('loglar').add({
-        'kullanici_id': userCredential.user!.uid,
-        'islem': 'Yeni Kullanıcı Kayıt Oldu ($_secilenRol)',
-        'tarih': FieldValue.serverTimestamp(),
-      }); // [cite: 22]
+        await FirebaseFirestore.instance.collection('loglar').add({
+          'kullanici_id': userCredential.user!.uid,
+          'islem': 'Yeni Kayıt Oluşturuldu (Rol: $_secilenRol)',
+          'tarih': FieldValue.serverTimestamp(),
+        });
+      }
 
-      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Kayıt Başarılı! Giriş yapabilirsiniz."),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Kayıt Hatası: $e"),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text("Hata: $e"), backgroundColor: Colors.red),
       );
+    } finally {
+      if (mounted)
+        setState(() {
+          _yukleniyor = false;
+        });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Kayıt Ol")),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            TextField(
-              controller: _emailController,
-              decoration: const InputDecoration(labelText: "E-posta"),
+      resizeToAvoidBottomInset: false,
+      body: Stack(
+        children: [
+          // KATMAN 1: ARKA PLAN
+          Container(
+            decoration: const BoxDecoration(
+              image: DecorationImage(
+                image: NetworkImage(
+                  'https://png.pngtree.com/thumb_back/fh260/background/20230716/pngtree-realistic-3d-rendering-of-speeding-clouds-against-a-blue-sky-background-image_3870197.jpg',
+                ),
+                fit: BoxFit.cover,
+              ),
             ),
-            TextField(
-              controller: _sifreController,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: "Şifre"),
+          ),
+          Container(color: Colors.black.withOpacity(0.35)),
+
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24.0),
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: Card(
+                    color: Colors.white.withOpacity(0.92),
+                    elevation: 12,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(32.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircleAvatar(
+                            radius: 35,
+                            backgroundColor: Colors.blue.shade50,
+                            child: const Icon(
+                              Icons.person_add_alt_1_outlined,
+                              size: 40,
+                              color: Colors.blue,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          const Text(
+                            "Yeni Hesap Oluştur",
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 30),
+
+                          // E-POSTA
+                          TextField(
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration: InputDecoration(
+                              labelText: "E-posta",
+                              prefixIcon: const Icon(Icons.email_outlined),
+                              filled: true,
+                              fillColor: Colors.white,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide(
+                                  color: Colors.grey.shade300,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Şifre kısmı
+                          TextField(
+                            controller: _sifreController,
+                            obscureText: true,
+                            decoration: InputDecoration(
+                              labelText: "Şifre",
+                              prefixIcon: const Icon(Icons.lock_outline),
+                              filled: true,
+                              fillColor: Colors.white,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide(
+                                  color: Colors.grey.shade300,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+
+                          SizedBox(
+                            width: double.infinity,
+                            child: SegmentedButton<String>(
+                              segments: const <ButtonSegment<String>>[
+                                ButtonSegment<String>(
+                                  value: 'Müşteri',
+                                  label: Text('Müşteri'),
+                                  icon: Icon(Icons.person_outline),
+                                ),
+                                ButtonSegment<String>(
+                                  value: 'Firma Yetkilisi',
+                                  label: Text('Yetkili'),
+                                  icon: Icon(
+                                    Icons.admin_panel_settings_outlined,
+                                  ),
+                                ),
+                              ],
+                              selected: <String>{_secilenRol},
+                              onSelectionChanged: (Set<String> yeniSecim) {
+                                setState(() {
+                                  _secilenRol = yeniSecim.first;
+                                });
+                              },
+                              style: SegmentedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                selectedBackgroundColor: Colors.blue.shade600,
+                                selectedForegroundColor: Colors.white,
+                                foregroundColor: Colors.grey.shade700,
+                                side: BorderSide(color: Colors.grey.shade300),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 28),
+
+                          // Kayıt olma butonu
+                          SizedBox(
+                            width: double.infinity,
+                            height: 52,
+                            child: ElevatedButton(
+                              onPressed: _yukleniyor ? null : kayitOl,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue.shade600,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                elevation: 3,
+                              ),
+                              child: _yukleniyor
+                                  ? const CircularProgressIndicator(
+                                      color: Colors.white,
+                                    )
+                                  : const Text(
+                                      "Kayıt Ol ve Tamamla",
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          //Ana ekrana hesabım var diyerek dönmemizi sağlayam kısım
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text(
+                              "Zaten hesabım var? Giriş Yap",
+                              style: TextStyle(
+                                color: Colors.blue,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
-            const SizedBox(height: 10),
-            DropdownButton<String>(
-              value: _secilenRol,
-              items: <String>['Müşteri', 'Firma Yetkilisi'].map((String value) {
-                // [cite: 14]
-                return DropdownMenuItem<String>(
-                  value: value,
-                  child: Text(value),
-                );
-              }).toList(),
-              onChanged: (newValue) {
-                setState(() {
-                  _secilenRol = newValue!;
-                });
-              },
+          ),
+
+          //sol üstteki geri dön butonu yerine < butonuna dönüştüğü kısım
+          Positioned(
+            top: 20,
+            left: 10,
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
             ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: kayitOl,
-              child: const Text("Kayıt Ol ve Tamamla"),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

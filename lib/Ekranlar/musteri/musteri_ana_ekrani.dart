@@ -17,7 +17,6 @@ class _MusteriAnaEkraniState extends State<MusteriAnaEkrani> {
 
   @override
   Widget build(BuildContext context) {
-    // Türkçe karakter hatası tamamen temizlendi
     final List<Widget> _sayfalar = [
       _DroneListeGorunumu(uid: widget.uid),
       MusteriProfilEkrani(uid: widget.uid),
@@ -41,7 +40,6 @@ class _MusteriAnaEkraniState extends State<MusteriAnaEkrani> {
   }
 }
 
-// Sınıf ismi İngilizce karakterlere uygun hale getirildi
 class _DroneListeGorunumu extends StatelessWidget {
   final String uid;
   const _DroneListeGorunumu({required this.uid});
