@@ -11,10 +11,17 @@ class AdminAnaEkrani extends StatefulWidget {
 }
 
 class _AdminAnaEkraniState extends State<AdminAnaEkrani> {
+  // Drone Controller'ları
   final _markaController = TextEditingController();
   final _modelController = TextEditingController();
   final _ucretController = TextEditingController();
   final _fotoController = TextEditingController();
+
+  // YENİ: Pilot Controller'ları
+  final _pilotIsimController = TextEditingController();
+  final _pilotLisansController = TextEditingController();
+  final _pilotUcretController = TextEditingController();
+  final _pilotFotoController = TextEditingController();
 
   void droneEkle() async {
     if (_markaController.text.isEmpty ||
@@ -23,13 +30,12 @@ class _AdminAnaEkraniState extends State<AdminAnaEkrani> {
         _fotoController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Lütfen tüm alanları doldurun!"),
+          content: Text("Lütfen tüm drone alanlarını doldurun!"),
           backgroundColor: Colors.orange,
         ),
       );
       return;
     }
-
     try {
       await FirebaseFirestore.instance.collection('dronelar').add({
         'marka': _markaController.text.trim(),
@@ -38,22 +44,18 @@ class _AdminAnaEkraniState extends State<AdminAnaEkrani> {
         'foto_url': _fotoController.text.trim(),
         'durum': true,
       });
-
-      // Loglama Sistemi
       await FirebaseFirestore.instance.collection('loglar').add({
         'kullanici_id': widget.uid,
         'islem':
             'Yeni Drone Eklendi (${_markaController.text} ${_modelController.text})',
         'tarih': FieldValue.serverTimestamp(),
       });
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Drone başarıyla sisteme eklendi!"),
           backgroundColor: Colors.green,
         ),
       );
-
       _markaController.clear();
       _modelController.clear();
       _ucretController.clear();
@@ -68,24 +70,62 @@ class _AdminAnaEkraniState extends State<AdminAnaEkrani> {
     }
   }
 
-  // Yöneticinin gelen talebi silebilmesine yarayan fonksiyon
+  // YENİ: PİLOT EKLEME FONKSİYONU
+  void pilotEkle() async {
+    if (_pilotIsimController.text.isEmpty ||
+        _pilotLisansController.text.isEmpty ||
+        _pilotUcretController.text.isEmpty ||
+        _pilotFotoController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Lütfen tüm pilot alanlarını doldurun!"),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    try {
+      await FirebaseFirestore.instance.collection('pilotlar').add({
+        'isim': _pilotIsimController.text.trim(),
+        'lisans': _pilotLisansController.text.trim(),
+        'gunluk_ucret': int.parse(_pilotUcretController.text.trim()),
+        'foto_url': _pilotFotoController.text.trim(),
+        'durum': true,
+      });
+      await FirebaseFirestore.instance.collection('loglar').add({
+        'kullanici_id': widget.uid,
+        'islem': 'Yeni Pilot Eklendi (${_pilotIsimController.text})',
+        'tarih': FieldValue.serverTimestamp(),
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Pilot başarıyla sisteme eklendi!"),
+          backgroundColor: Colors.blue,
+        ),
+      );
+      _pilotIsimController.clear();
+      _pilotLisansController.clear();
+      _pilotUcretController.clear();
+      _pilotFotoController.clear();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Pilot Ekleme Hatası: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   void talebiSil(String docId, String droneModel) async {
     try {
       await FirebaseFirestore.instance
           .collection('rezervasyonlar')
           .doc(docId)
           .delete();
-
-      // Silme işlemininde loglanmasına yarayan fonksiyon
-      await FirebaseFirestore.instance.collection('loglar').add({
-        'kullanici_id': widget.uid,
-        'islem': 'Kiralama Talebi Silindi/Reddedildi ($droneModel)',
-        'tarih': FieldValue.serverTimestamp(),
-      });
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Kiralama talebi başarıyla kaldırıldı."),
+          content: Text("Talep başarıyla kaldırıldı."),
           backgroundColor: Colors.blueGrey,
         ),
       );
@@ -99,6 +139,97 @@ class _AdminAnaEkraniState extends State<AdminAnaEkrani> {
     }
   }
 
+  void droneSil(String docId, String droneIsim) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('dronelar')
+          .doc(docId)
+          .delete();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("$droneIsim silindi."),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Hata: $e"), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  void droneDuzenleDialog(String docId, Map<String, dynamic> mevcutVeri) {
+    final markaEditController = TextEditingController(
+      text: mevcutVeri['marka'],
+    );
+    final modelEditController = TextEditingController(
+      text: mevcutVeri['model'],
+    );
+    final ucretEditController = TextEditingController(
+      text: mevcutVeri['gunluk_ucret'].toString(),
+    );
+    final fotoEditController = TextEditingController(
+      text: mevcutVeri['foto_url'],
+    );
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text("Drone Düzenle"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: markaEditController,
+                decoration: const InputDecoration(labelText: "Marka"),
+              ),
+              TextField(
+                controller: modelEditController,
+                decoration: const InputDecoration(labelText: "Model"),
+              ),
+              TextField(
+                controller: ucretEditController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: "Ücret"),
+              ),
+              TextField(
+                controller: fotoEditController,
+                decoration: const InputDecoration(labelText: "Fotoğraf URL"),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("İptal"),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                await FirebaseFirestore.instance
+                    .collection('dronelar')
+                    .doc(docId)
+                    .update({
+                      'marka': markaEditController.text.trim(),
+                      'model': modelEditController.text.trim(),
+                      'gunluk_ucret': int.parse(
+                        ucretEditController.text.trim(),
+                      ),
+                      'foto_url': fotoEditController.text.trim(),
+                    });
+                if (context.mounted) Navigator.pop(context);
+              },
+              child: const Text("Güncelle"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -110,6 +241,7 @@ class _AdminAnaEkraniState extends State<AdminAnaEkrani> {
         ),
         centerTitle: true,
         backgroundColor: Colors.blue.shade100,
+        elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -122,138 +254,231 @@ class _AdminAnaEkraniState extends State<AdminAnaEkrani> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Drone ekleme kısmı
+            // YENİ SİMETRİK İKİLİ FORM DÜZENİ (YAN YANA)
             Center(
               child: Container(
-                constraints: const BoxConstraints(maxWidth: 500),
-                child: Card(
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: const [
-                            Icon(
-                              Icons.add_box_rounded,
-                              color: Colors.blue,
-                              size: 28,
-                            ),
-                            SizedBox(width: 8),
-                            Text(
-                              "Yeni Drone Kayıt Formu",
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
+                constraints: const BoxConstraints(maxWidth: 1100),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // SOL TARAF: DRONE KAYIT FORMU
+                    Expanded(
+                      child: Card(
+                        elevation: 4,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(20.0),
+                          child: Column(
+                            children: [
+                              Row(
+                                children: const [
+                                  Icon(
+                                    Icons.add_box_rounded,
+                                    color: Colors.blue,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    "Yeni Drone Kayıt Formu",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ],
-                        ),
-                        const Divider(height: 25),
-
-                        TextField(
-                          controller: _markaController,
-                          decoration: InputDecoration(
-                            labelText: "Drone Markası (Örn: DJI)",
-                            prefixIcon: const Icon(
-                              Icons.branding_watermark_outlined,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              vertical: 12,
-                              horizontal: 16,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        TextField(
-                          controller: _modelController,
-                          decoration: InputDecoration(
-                            labelText: "Drone Modeli (Örn: Air 3)",
-                            prefixIcon: const Icon(Icons.flight),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              vertical: 12,
-                              horizontal: 16,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        TextField(
-                          controller: _ucretController,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: "Günlük Kiralama Ücreti (TL)",
-                            prefixIcon: const Icon(Icons.payments_outlined),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              vertical: 12,
-                              horizontal: 16,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        TextField(
-                          controller: _fotoController,
-                          decoration: InputDecoration(
-                            labelText: "Fotoğraf İnternet Linki (URL)",
-                            prefixIcon: const Icon(Icons.image_outlined),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              vertical: 12,
-                              horizontal: 16,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-
-                        SizedBox(
-                          width: double.infinity,
-                          height: 48,
-                          child: ElevatedButton.icon(
-                            onPressed: droneEkle,
-                            icon: const Icon(Icons.cloud_upload),
-                            label: const Text(
-                              "Drone'u Sisteme Kaydet",
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
+                              const Divider(height: 25),
+                              TextField(
+                                controller: _markaController,
+                                decoration: InputDecoration(
+                                  labelText: "Drone Markası (Örn: DJI)",
+                                  prefixIcon: const Icon(
+                                    Icons.branding_watermark_outlined,
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
                               ),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blue,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: _modelController,
+                                decoration: InputDecoration(
+                                  labelText: "Drone Modeli (Örn: Air 3)",
+                                  prefixIcon: const Icon(Icons.flight),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
                               ),
-                              elevation: 2,
-                            ),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: _ucretController,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: "Günlük Kiralama Ücreti (TL)",
+                                  prefixIcon: const Icon(
+                                    Icons.payments_outlined,
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: _fotoController,
+                                decoration: InputDecoration(
+                                  labelText: "Fotoğraf İnternet Linki (URL)",
+                                  prefixIcon: const Icon(Icons.image_outlined),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 45,
+                                child: ElevatedButton.icon(
+                                  onPressed: droneEkle,
+                                  icon: const Icon(Icons.cloud_upload),
+                                  label: const Text(
+                                    "Drone'u Kaydet",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blue,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
+                      ),
                     ),
-                  ),
+
+                    const SizedBox(width: 16), // İki form arasındaki boşluk
+                    // SAĞ TARAF: YENİ PİLOT KAYIT FORMU (Birebir Simetrik)
+                    Expanded(
+                      child: Card(
+                        elevation: 4,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(20.0),
+                          child: Column(
+                            children: [
+                              Row(
+                                children: const [
+                                  Icon(
+                                    Icons.person_add_alt_1_rounded,
+                                    color: Colors.teal,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    "Yeni Pilot Kayıt Formu",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const Divider(height: 25),
+                              TextField(
+                                controller: _pilotIsimController,
+                                decoration: InputDecoration(
+                                  labelText: "Pilot Adı Soyadı",
+                                  prefixIcon: const Icon(Icons.person_outline),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: _pilotLisansController,
+                                decoration: InputDecoration(
+                                  labelText: "Lisans Sınıfı (Örn: IHA-0)",
+                                  prefixIcon: const Icon(
+                                    Icons.card_membership_outlined,
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: _pilotUcretController,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: "Günlük Pilot Ücreti (TL)",
+                                  prefixIcon: const Icon(
+                                    Icons.monetization_on_outlined,
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: _pilotFotoController,
+                                decoration: InputDecoration(
+                                  labelText: "Pilot Fotoğraf Linki (URL)",
+                                  prefixIcon: const Icon(
+                                    Icons.portrait_outlined,
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 45,
+                                child: ElevatedButton.icon(
+                                  onPressed: pilotEkle,
+                                  icon: const Icon(Icons.badge_outlined),
+                                  label: const Text(
+                                    "Pilotu Kaydet",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.teal,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
 
             const SizedBox(height: 32),
 
+            // MÜŞTERİ TALEPLERİ
             Row(
               children: const [
                 Icon(
@@ -263,16 +488,11 @@ class _AdminAnaEkraniState extends State<AdminAnaEkrani> {
                 SizedBox(width: 8),
                 Text(
                   "Müşterilerden Gelen Kiralama Talepleri",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
             const Divider(height: 20),
-
             StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('rezervasyonlar')
@@ -280,21 +500,12 @@ class _AdminAnaEkraniState extends State<AdminAnaEkrani> {
               builder: (context, snapshot) {
                 if (!snapshot.hasData)
                   return const Center(child: CircularProgressIndicator());
-
                 final docs = snapshot.data!.docs;
-                if (docs.isEmpty) {
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 16.0),
-                    child: Text(
-                      "Henüz aktif bir kiralama talebi bulunmuyor.",
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 14,
-                      ),
-                    ),
+                if (docs.isEmpty)
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8.0),
+                    child: Text("Henüz aktif bir kiralama talebi bulunmuyor."),
                   );
-                }
-
                 return ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
@@ -302,49 +513,95 @@ class _AdminAnaEkraniState extends State<AdminAnaEkrani> {
                   itemBuilder: (context, index) {
                     final doc = docs[index];
                     final talep = doc.data() as Map<String, dynamic>;
-                    final String droneModel =
-                        talep['drone_model'] ?? "Bilinmeyen Drone";
-                    final String musteriId = talep['kullanici_id'] ?? "ID Yok";
-
                     return Card(
-                      elevation: 2,
-                      margin: const EdgeInsets.symmetric(vertical: 6),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
                       child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: Colors.orange.shade50,
-                          child: const Icon(
-                            Icons.hourglass_empty_rounded,
+                        leading: const CircleAvatar(
+                          child: Icon(
+                            Icons.hourglass_empty,
                             color: Colors.orange,
                           ),
                         ),
                         title: Text(
-                          droneModel,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
+                          talep['drone_model'] ??
+                              talep['pilot_isim'] ??
+                              "Kiralama",
                         ),
-                        subtitle: Padding(
-                          padding: const EdgeInsets.only(top: 4.0),
-                          child: Text(
-                            "Müşteri ID: ${musteriId.length > 12 ? musteriId.substring(0, 12) + '...' : musteriId}",
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontSize: 13,
-                            ),
-                          ),
+                        subtitle: Text(
+                          "Tür: ${talep['kiralanan_tur'] ?? 'Belirtilmemiş'}",
                         ),
-
                         trailing: IconButton(
                           icon: const Icon(
                             Icons.delete_outline,
                             color: Colors.red,
                           ),
-                          tooltip: "Talebi Kaldır",
-                          onPressed: () => talebiSil(doc.id, droneModel),
+                          onPressed: () => talebiSil(doc.id, ""),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+
+            const SizedBox(height: 24),
+
+            // SİSTEMDEKİ DRONELAR
+            Row(
+              children: const [
+                Icon(Icons.inventory_2_outlined, color: Colors.blueGrey),
+                SizedBox(width: 8),
+                Text(
+                  "Sistemdeki Mevcut Dronelar",
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const Divider(height: 20),
+            StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('dronelar')
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData)
+                  return const Center(child: CircularProgressIndicator());
+                final docs = snapshot.data!.docs;
+                return ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: docs.length,
+                  itemBuilder: (context, index) {
+                    final doc = docs[index];
+                    final drone = doc.data() as Map<String, dynamic>;
+                    return Card(
+                      child: ListTile(
+                        leading: Image.network(
+                          drone['foto_url'] ?? "",
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
+                          errorBuilder: (c, e, s) => const Icon(Icons.flight),
+                        ),
+                        title: Text("${drone['marka']} ${drone['model']}"),
+                        subtitle: Text("${drone['gunluk_ucret']} TL / Gün"),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(
+                                Icons.edit_note,
+                                color: Colors.blue,
+                              ),
+                              onPressed: () =>
+                                  droneDuzenleDialog(doc.id, drone),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete_forever,
+                                color: Colors.red,
+                              ),
+                              onPressed: () => droneSil(doc.id, drone['model']),
+                            ),
+                          ],
                         ),
                       ),
                     );

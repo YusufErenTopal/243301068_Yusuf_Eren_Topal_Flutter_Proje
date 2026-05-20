@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
 
-// Ekran importları (Klasörlerden çekiyoruz)
+//Klasörlerden çektiğimiz ekran importları
 import 'Ekranlar/auth/giris_ekrani.dart';
 import 'Ekranlar/musteri/musteri_ana_ekrani.dart';
 import 'Ekranlar/admin/admin_ana_ekrani.dart';
@@ -27,7 +27,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
-      home: const AuthKontrol(), // [cite: 17]
+      home: const AuthKontrol(),
     );
   }
 }
@@ -38,7 +38,7 @@ class AuthKontrol extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(), // [cite: 17]
+      stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -73,7 +73,7 @@ class RolYonlendirici extends StatelessWidget {
         }
         if (snapshot.hasData && snapshot.data!.exists) {
           final data = snapshot.data!.data() as Map<String, dynamic>;
-          final String rol = data['rol'] ?? 'Müşteri'; // [cite: 14]
+          final String rol = data['rol'] ?? 'Müşteri';
 
           if (rol == 'Firma Yetkilisi') {
             return AdminAnaEkrani(uid: uid);

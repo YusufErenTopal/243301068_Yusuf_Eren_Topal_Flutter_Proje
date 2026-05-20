@@ -21,7 +21,6 @@ class MusteriProfilEkrani extends StatelessWidget {
       ),
       body: Column(
         children: [
-          // ÜST BÖLÜM: YUVARLAK PROFİL FOTOĞRAFI VE KULLANICI BİLGİSİ
           Container(
             width: double.infinity,
             decoration: BoxDecoration(
@@ -33,7 +32,7 @@ class MusteriProfilEkrani extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 24),
             child: Column(
               children: [
-                // Hayal ettiğin o yuvarlak profil fotoğrafı kısmı
+                //Yuvarlak profil fotoğrafı
                 CircleAvatar(
                   radius: 50,
                   backgroundColor: Colors.white,
@@ -48,7 +47,7 @@ class MusteriProfilEkrani extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                // Aktif giriş yapan müşterinin UID'si (Hoca veritabanı bağını görsün diye)
+                // Aktif giriş yapan müşterinin UID'si 
                 Text(
                   "Müşteri Hesabı",
                   style: const TextStyle(
@@ -59,7 +58,7 @@ class MusteriProfilEkrani extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  "ID: ${uid.substring(0, 8)}...", // ID çok uzun görünmesin diye ilk 8 karakteri
+                  "ID: ${uid.substring(0, 8)}...", // ID çok uzun görünmesin diye ilk 8 karakteri alır
                   style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
                 ),
               ],
@@ -68,7 +67,7 @@ class MusteriProfilEkrani extends StatelessWidget {
 
           const SizedBox(height: 20),
 
-          // ALT BÖLÜM: KİRALAMA GEÇMİŞİ VE MALİYET ALANI
+          
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -160,7 +159,7 @@ class MusteriProfilEkrani extends StatelessWidget {
             ),
           ),
 
-          // OTURUMU KAPAT BUTONU
+          //Oturumu kapat butonu
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: SizedBox(
@@ -179,7 +178,7 @@ class MusteriProfilEkrani extends StatelessWidget {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  elevation: 2, // Hafif gölge efekti
+                  elevation: 2, // Hafif gölge efekti ekliyor
                 ),
               ),
             ),

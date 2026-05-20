@@ -31,23 +31,34 @@ class _GirisEkraniState extends State<GirisEkrani> {
     });
 
     try {
+      // Senin mevcut giriş kodun (signInWithEmailAndPassword...)
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _sifreController.text.trim(),
       );
+    } on FirebaseAuthException catch (e) {
+      // Hata ne olursa olsun (şifre yanlış, kullanıcı yok veya geçersiz kimlik)
+      // kullanıcıya tek ve güvenli bir kurumsal mesaj gösteriyoruz
+      String mesaj = "E-posta adresiniz veya şifreniz hatalı.";
 
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        await FirebaseFirestore.instance.collection('loglar').add({
-          'kullanici_id': user.uid,
-          'islem': 'Kullanıcı Giriş Yaptı',
-          'tarih': FieldValue.serverTimestamp(),
-        });
+      // Eğer e-posta formatı tamamen bozuksa (örn: "abc@com" yerine sadece "abc" yazıldıysa)
+      // bunu müşteriye bildirmek kullanıcı deneyimi açısından iyidir
+      if (e.code == 'invalid-email') {
+        mesaj = "Lütfen geçerli bir e-posta adresi biçimi giriniz.";
       }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(mesaj),
+          backgroundColor: Colors.red.shade700,
+          behavior:
+              SnackBarBehavior.floating, // Ekrandan biraz bağımsız şık dursun
+        ),
+      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Giriş Hatası: $e"),
+          content: Text("Beklenmedik bir hata oluştu: $e"),
           backgroundColor: Colors.red,
         ),
       );
@@ -163,7 +174,7 @@ class _GirisEkraniState extends State<GirisEkrani> {
                           ),
                           const SizedBox(height: 24),
 
-                          // GİRİŞ BUTONU
+                          // Giriş butonu
                           SizedBox(
                             width: double.infinity,
                             height: 52,
@@ -192,7 +203,7 @@ class _GirisEkraniState extends State<GirisEkrani> {
                           ),
                           const SizedBox(height: 20),
 
-                          // KAYIT OLMAYA YÖNLENDİRME
+                          // Kayıt olmaya yönlendiren kısım
                           TextButton(
                             onPressed: () => Navigator.push(
                               context,

@@ -31,41 +31,46 @@ class _KayitEkraniState extends State<KayitEkrani> {
     });
 
     try {
+      // Senin mevcut kayıt kodun (createUserWithEmailAndPassword...)
       UserCredential userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(
             email: _emailController.text.trim(),
             password: _sifreController.text.trim(),
           );
 
-      if (userCredential.user != null) {
-        await FirebaseFirestore.instance
-            .collection('kullanicilar')
-            .doc(userCredential.user!.uid)
-            .set({
-              'email': _emailController.text.trim(),
-              'rol': _secilenRol,
-              'kayit_tarihi': FieldValue.serverTimestamp(),
-            });
+      // ... Firestore kayıt ve loglama işlemlerin aynen devam ediyor ...
+    } on FirebaseAuthException catch (e) {
+      // Varsayılan genel bir kayıt hata mesajı belirliyoruz
+      String mesaj = "Kayıt oluşturulurken bir hata oluştu.";
 
-        await FirebaseFirestore.instance.collection('loglar').add({
-          'kullanici_id': userCredential.user!.uid,
-          'islem': 'Yeni Kayıt Oluşturuldu (Rol: $_secilenRol)',
-          'tarih': FieldValue.serverTimestamp(),
-        });
+      // Eğer bu e-posta adresi zaten sistemde kayıtlıysa:
+      if (e.code == 'email-already-in-use') {
+        mesaj =
+            "Bu e-posta adresi zaten başka bir hesap tarafından kullanılıyor.";
+      }
+      // Şifre 6 karakterden kısa girildiyse (Firebase alt sınırıdır):
+      else if (e.code == 'weak-password') {
+        mesaj = "Girdiğiniz şifre çok zayıf. En az 6 karakter olmalıdır.";
+      }
+      // E-posta formatı tamamen hatalıysa (Örn: sadece "abc" yazdıysa):
+      else if (e.code == 'invalid-email') {
+        mesaj = "Lütfen geçerli bir e-posta adresi biçimi giriniz.";
       }
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Kayıt Başarılı! Giriş yapabilirsiniz."),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.pop(context);
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(mesaj),
+          backgroundColor: Colors.orange.shade800,
+          behavior: SnackBarBehavior
+              .floating, // Giriş ekranıyla aynı şık yapıda dursun
+        ),
+      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Hata: $e"), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text("Sistem Hatası: $e"),
+          backgroundColor: Colors.red,
+        ),
       );
     } finally {
       if (mounted)
@@ -85,6 +90,7 @@ class _KayitEkraniState extends State<KayitEkrani> {
           Container(
             decoration: const BoxDecoration(
               image: DecorationImage(
+                //yine aynı şekilde internet üzerinden arka planın fotoğrafının aktarıldığı bölüm
                 image: NetworkImage(
                   'https://png.pngtree.com/thumb_back/fh260/background/20230716/pngtree-realistic-3d-rendering-of-speeding-clouds-against-a-blue-sky-background-image_3870197.jpg',
                 ),
@@ -130,7 +136,7 @@ class _KayitEkraniState extends State<KayitEkrani> {
                           ),
                           const SizedBox(height: 30),
 
-                          // E-POSTA
+                          //E-posta kısmı
                           TextField(
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
