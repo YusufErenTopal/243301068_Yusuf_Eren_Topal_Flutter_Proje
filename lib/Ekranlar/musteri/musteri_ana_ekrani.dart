@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'musteri_profil_ekrani.dart';
-import 'musteri_pilot_ekrani.dart'; // Yeni oluşturduğumuz ekranı dahil ediyoruz
+import 'musteri_pilot_ekrani.dart';
+import 'musteri_odeme_ekrani.dart'; // Yeni ekranı bağladık
 
 class MusteriAnaEkrani extends StatefulWidget {
   final String uid;
@@ -12,7 +13,7 @@ class MusteriAnaEkrani extends StatefulWidget {
 }
 
 class _MusteriAnaEkraniState extends State<MusteriAnaEkrani> {
-  int _secilenSekme = 0; // 0: Dronelar, 1: Pilotlar, 2: Profilim
+  int _secilenSekme = 0; // 0: Dronelar, 1: Pilotlar, 2: Sepetim, 3: Profilim
 
   void droneKirala(String droneModel, int gunlukUcret) async {
     try {
@@ -22,20 +23,16 @@ class _MusteriAnaEkraniState extends State<MusteriAnaEkrani> {
         'drone_model': droneModel,
         'toplam_maliyet': gunlukUcret,
         'tarih': FieldValue.serverTimestamp(),
-        'durum': 'Beklemede',
-      });
-
-      await FirebaseFirestore.instance.collection('loglar').add({
-        'kullanici_id': widget.uid,
-        'islem': 'Drone Kiralama Talebi Oluşturuldu ($droneModel)',
-        'tarih': FieldValue.serverTimestamp(),
+        'durum': 'Beklemede', // Ödeme ekranına düşmesi için Beklemede kalıyor
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("$droneModel kiralama talebi iletildi!"),
-            backgroundColor: Colors.green,
+            content: Text(
+              "$droneModel sepetinize eklendi! Ödeme sekmesinden tamamlayabilirsiniz.",
+            ),
+            backgroundColor: Colors.blue,
           ),
         );
       }
@@ -48,7 +45,7 @@ class _MusteriAnaEkraniState extends State<MusteriAnaEkrani> {
 
   @override
   Widget build(BuildContext context) {
-    // 3 SEKMELİ YENİ SAYFA YAPISI
+    // 4 SEKMELİ YENİ LİSTE DÜZENİ
     final List<Widget> _sayfalar = [
       // SEKME 0: DRONELAR LİSTESİ
       StreamBuilder<QuerySnapshot>(
@@ -130,7 +127,7 @@ class _MusteriAnaEkraniState extends State<MusteriAnaEkrani> {
                               ),
                               onPressed: () =>
                                   droneKirala("$marka $model", ucret),
-                              child: const Text("Kirala"),
+                              child: const Text("Sepete Ekle"),
                             ),
                           ],
                         ),
@@ -144,17 +141,19 @@ class _MusteriAnaEkraniState extends State<MusteriAnaEkrani> {
         },
       ),
 
-      // SEKME 1: YENİ EKLEDİĞİMİZ PİLOTLAR SAYFASI
+      // SEKME 1: PİLOTLAR SAYFASI
       MusteriPilotEkrani(uid: widget.uid),
 
-      // SEKME 2: PROFİLİM SAYFASI
+      // SEKME 2: YENİ ÖDEME VE SEPET SAYFASI (Profilin Solu)
+      MusteriOdemeEkrani(uid: widget.uid),
+
       MusteriProfilEkrani(uid: widget.uid),
     ];
 
-    // ÜST BAŞLIKLARI DA DİNAMİK YAPALIM
     final List<String> _basliklar = [
       "Kiralık Dronelar",
       "Uzman Pilotlarımız",
+      "Yemeksepeti Ödeme Sistemi",
       "Profil Özeti",
     ];
 
@@ -171,7 +170,7 @@ class _MusteriAnaEkraniState extends State<MusteriAnaEkrani> {
       ),
       body: _sayfalar[_secilenSekme],
 
-      // 3 SEKMELİ HALE GETİRİLEN YENİ BOTTOM NAV BAR
+      // 4 SEKMELİ BOTTOM NAV BAR
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _secilenSekme,
         onTap: (index) {
@@ -181,8 +180,7 @@ class _MusteriAnaEkraniState extends State<MusteriAnaEkrani> {
         },
         selectedItemColor: Colors.blue.shade700,
         unselectedItemColor: Colors.grey.shade600,
-        type: BottomNavigationBarType
-            .fixed, // 3 ve daha fazla sekmede kayma yapmasın diye sabitledik
+        type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.navigation_outlined),
@@ -190,11 +188,15 @@ class _MusteriAnaEkraniState extends State<MusteriAnaEkrani> {
             label: "Dronelar",
           ),
           BottomNavigationBarItem(
-            icon: Icon(
-              Icons.supervisor_account_outlined,
-            ), // Pilotlar için şık ikon
+            icon: Icon(Icons.supervisor_account_outlined),
             activeIcon: Icon(Icons.supervisor_account),
             label: "Pilotlar",
+          ),
+          // YENİ ÖDEME İKONU (Profilin solunda)
+          BottomNavigationBarItem(
+            icon: Icon(Icons.shopping_bag_outlined),
+            activeIcon: Icon(Icons.shopping_bag),
+            label: "Sepetim",
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),
