@@ -14,6 +14,30 @@ class _MusteriOdemeEkraniState extends State<MusteriOdemeEkrani> {
   final _sktController = TextEditingController();
   final _cvvController = TextEditingController();
 
+  // YENİ: Sepetten Ürün Çıkarma Fonksiyonu
+  void sepettenCikar(String docId, String urunIsim) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('rezervasyonlar')
+          .doc(docId)
+          .delete();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("$urunIsim sepetinizden kaldırıldı."),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Hata: $e"), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   void odemeYap(int toplamTutar, List<String> docIds) async {
     if (_kartNoController.text.isEmpty ||
         _sktController.text.isEmpty ||
@@ -65,7 +89,7 @@ class _MusteriOdemeEkraniState extends State<MusteriOdemeEkrani> {
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             content: Text(
-              "Toplam $toplamTutar TL tutarındaki kiralama işleminiz başarıyla onaylanmıştır.",
+              "Toplam $toplamTutar TL tutarındaki kiralama işleminiz başarıyla onaylanmıştır. Keyifli uçuşlar dileriz!",
             ),
             actions: [
               TextButton(
@@ -124,6 +148,10 @@ class _MusteriOdemeEkraniState extends State<MusteriOdemeEkrani> {
                   "Sepetiniz şu an boş.",
                   style: TextStyle(fontSize: 16, color: Colors.grey),
                 ),
+                Text(
+                  "Dronelar veya Pilotlar sekmesinden ekleme yapın.",
+                  style: TextStyle(fontSize: 13, color: Colors.grey),
+                ),
               ],
             ),
           );
@@ -139,12 +167,15 @@ class _MusteriOdemeEkraniState extends State<MusteriOdemeEkrani> {
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
+
+              // SEPETTEKİ ÖGELERİN LİSTESİ (GÜNCELLENEN KISIM)
               ListView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: docs.length,
                 itemBuilder: (context, index) {
                   final veri = docs[index].data() as Map<String, dynamic>;
+                  final String id = docs[index].id;
                   final String isim =
                       veri['drone_model'] ?? veri['pilot_isim'] ?? "Hizmet";
                   final String tur = veri['kiralanan_tur'] ?? "Kiralama";
@@ -161,15 +192,39 @@ class _MusteriOdemeEkraniState extends State<MusteriOdemeEkrani> {
                         isim,
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
-                      trailing: Text(
-                        "$maliyet TL",
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      subtitle: Text("Tür: $tur"),
+                      // SAĞ TARAF: FİYAT BİLGİSİ VE SİLME BUTONU
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            "$maliyet TL",
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              color: Colors.redAccent,
+                            ),
+                            onPressed: () => sepettenCikar(
+                              id,
+                              isim,
+                            ), // Çöp kutusuna basınca silecek
+                          ),
+                        ],
                       ),
                     ),
                   );
                 },
               ),
+
               const Divider(height: 32),
+
+              // KART GİRİŞ ALANI
               Card(
                 color: Colors.blue.shade50,
                 shape: RoundedRectangleBorder(
@@ -212,7 +267,7 @@ class _MusteriOdemeEkraniState extends State<MusteriOdemeEkrani> {
                               controller: _sktController,
                               decoration: InputDecoration(
                                 labelText: "Son Kul. Tarihi",
-                                hintText: "AA/YY", // Hata düzeltilmiş yer
+                                hintText: "AA/YY",
                                 filled: true,
                                 fillColor: Colors.white,
                                 border: OutlineInputBorder(
@@ -244,7 +299,10 @@ class _MusteriOdemeEkraniState extends State<MusteriOdemeEkrani> {
                   ),
                 ),
               ),
+
               const SizedBox(height: 24),
+
+              // TOPLAM TUTAR BARI VE ÖDEME BUTONU
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -263,6 +321,7 @@ class _MusteriOdemeEkraniState extends State<MusteriOdemeEkrani> {
                 ],
               ),
               const SizedBox(height: 16),
+
               SizedBox(
                 width: double.infinity,
                 height: 50,

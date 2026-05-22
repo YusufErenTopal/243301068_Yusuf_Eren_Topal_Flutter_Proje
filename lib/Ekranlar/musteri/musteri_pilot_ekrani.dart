@@ -5,14 +5,87 @@ class MusteriPilotEkrani extends StatelessWidget {
   final String uid;
   const MusteriPilotEkrani({super.key, required this.uid});
 
-  void pilotKirala(BuildContext context, String pilotIsim, int ucret) async {
+  void pilotKirala(
+    BuildContext context,
+    String pilotIsim,
+    int ucret,
+    int pilotLisansSeviyesi,
+    String pilotIl,
+  ) async {
     try {
-      // Rezervasyonlar tablosuna pilot kiralama kaydı atıyoruz
+      // 1. KONTROL: Kullanıcının sepetinde duran (Beklemede olan) drone'ları çekiyoruz
+      var sepetSnapshot = await FirebaseFirestore.instance
+          .collection('rezervasyonlar')
+          .where('kullanici_id', isEqualTo: uid)
+          .where('durum', isEqualTo: 'Beklemede')
+          .where('kiralanan_tur', isEqualTo: 'Drone')
+          .get();
+
+      // Sepetteki her bir drone'un gereksinim seviyesini tek tek inceliyoruz
+      for (var doc in sepetSnapshot.docs) {
+        final droneVeri = doc.data();
+
+        // GÜVENLİ TÜR DÖNÜŞÜMÜ: Gelen veri ne olursa olsun sağlama alıyoruz
+        int gerekenSeviye = 2; // Varsayılan değer
+        if (droneVeri['gereken_lisans_seviyesi'] != null) {
+          gerekenSeviye = int.parse(
+            droneVeri['gereken_lisans_seviyesi'].toString(),
+          );
+        }
+
+        // EĞER PİLOTUN LİSANSI DRONE İÇİN YETERSİZSE ENGELE TAKILSIN
+        if (pilotLisansSeviyesi < gerekenSeviye) {
+          if (context.mounted) {
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                title: Row(
+                  children: const [
+                    Icon(Icons.gpp_bad_rounded, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text(
+                      "Yetersiz Yetki Seviyesi",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ],
+                ),
+                content: Text(
+                  "$pilotIsim adlı pilotun lisans seviyesi bu drone sınıfını uçurmaya yetmiyor. "
+                  "Lütfen sepetinizdeki drone'a uygun, daha üst düzey bir pilot seçiniz.",
+                  style: const TextStyle(fontSize: 15),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      "Anladım",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+          return; // Kontrolden geçemediği için fonksiyonu burada kırıyoruz, veritabanına eklemiyoruz!
+        }
+      }
+
+      // 2. KONTROLDEN GEÇERSE SEPETE EKLEME İŞLEMİ YAPILIR
       await FirebaseFirestore.instance.collection('rezervasyonlar').add({
         'kullanici_id': uid,
         'kiralanan_tur': 'Pilot',
         'pilot_isim': pilotIsim,
         'toplam_maliyet': ucret,
+        'pilot_il': pilotIl,
         'tarih': FieldValue.serverTimestamp(),
         'durum': 'Beklemede',
       });
@@ -20,43 +93,39 @@ class MusteriPilotEkrani extends StatelessWidget {
       // Loglama
       await FirebaseFirestore.instance.collection('loglar').add({
         'kullanici_id': uid,
-        'islem': 'Pilot Kiralama Talebi Oluşturuldu ($pilotIsim)',
+        'islem':
+            'Pilot Sepete Eklendi ($pilotIsim - Lisans Seviyesi: $pilotLisansSeviyesi)',
         'tarih': FieldValue.serverTimestamp(),
       });
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("$pilotIsim için kiralama talebi iletildi!"),
+            content: Text("$pilotIsim sepetinize eklendi!"),
             backgroundColor: Colors.green,
           ),
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Hata: $e"), backgroundColor: Colors.red),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Hata: $e"), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot>(
-      // Firestore'daki 'pilotlar' koleksiyonunu canlı dinliyoruz
       stream: FirebaseFirestore.instance.collection('pilotlar').snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
-
         final docs = snapshot.data!.docs;
         if (docs.isEmpty) {
-          return Center(
-            child: Text(
-              "Sistemde şu an müsait pilot bulunmuyor.",
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
-            ),
-          );
+          return const Center(child: Text("Sistemde aktif pilot bulunmuyor."));
         }
 
         return ListView.builder(
@@ -65,9 +134,13 @@ class MusteriPilotEkrani extends StatelessWidget {
           itemBuilder: (context, index) {
             final pilot = docs[index].data() as Map<String, dynamic>;
             final String isim = pilot['isim'] ?? "Bilinmeyen Pilot";
-            final String lisans = pilot['lisans'] ?? "Klasik Lisans";
+            final String lisansAd = pilot['lisans'] ?? "İHA-1";
+            final int lisansSeviye = pilot['lisans_seviyesi'] ?? 2;
             final int ucret = pilot['gunluk_ucret'] ?? 0;
             final String fotoUrl = pilot['foto_url'] ?? "";
+            final String il = pilot['il'] ?? "Konya";
+            final String ilce = pilot['ilce'] ?? "Selçuklu";
+            final String lisansNo = pilot['lisans_no'] ?? "TR-PIL-2026X";
 
             return Card(
               elevation: 3,
@@ -76,30 +149,25 @@ class MusteriPilotEkrani extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Padding(
-                padding: const EdgeInsets.all(
-                  12.0,
-                ), // İçerik ile kart arası temiz boşluk
+                padding: const EdgeInsets.all(12.0),
                 child: Row(
-                  // Resim solda, içerikler sağda olacak şekilde Row düzeni
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // SOL TARAF: PİLOT FOTOĞRAFI (KARE EBATINDA)
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
-                        width: 100, // Drone kartı ile birebir aynı ebat
+                        width: 100,
                         height: 100,
                         color: Colors.grey.shade200,
                         child: fotoUrl.isNotEmpty
                             ? Image.network(
                                 fotoUrl,
                                 fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    const Icon(
-                                      Icons.person,
-                                      size: 40,
-                                      color: Colors.grey,
-                                    ),
+                                errorBuilder: (c, e, s) => const Icon(
+                                  Icons.person,
+                                  size: 40,
+                                  color: Colors.grey,
+                                ),
                               )
                             : const Icon(
                                 Icons.person,
@@ -108,15 +176,10 @@ class MusteriPilotEkrani extends StatelessWidget {
                               ),
                       ),
                     ),
-
-                    const SizedBox(
-                      width: 16,
-                    ), // Resim ile metinler arası boşluk
-                    // SAĞ TARAF: DETAYLAR VE ALTINDA DURAN BUTON
+                    const SizedBox(width: 16),
                     Expanded(
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment
-                            .start, // Her şeyi sola yaslıyoruz
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             isim,
@@ -128,11 +191,30 @@ class MusteriPilotEkrani extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            "Sınıfı: $lisans",
+                            "Sınıf: $lisansAd (No: $lisansNo)",
                             style: TextStyle(
-                              color: Colors.grey.shade600,
+                              color: Colors.grey.shade700,
                               fontSize: 13,
+                              fontWeight: FontWeight.w500,
                             ),
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.location_on,
+                                size: 14,
+                                color: Colors.redAccent,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                "$il / $ilce",
+                                style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 6),
                           Text(
@@ -144,11 +226,8 @@ class MusteriPilotEkrani extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 12),
-
-                          // İŞTE SEÇ BUTONU (BİLGİLERİN TAM ALTINDA)
                           Align(
-                            alignment: Alignment
-                                .centerLeft, // Butonu sola yanaştırıyoruz
+                            alignment: Alignment.centerLeft,
                             child: ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.blue.shade600,
@@ -161,8 +240,13 @@ class MusteriPilotEkrani extends StatelessWidget {
                                   vertical: 8,
                                 ),
                               ),
-                              onPressed: () =>
-                                  pilotKirala(context, isim, ucret),
+                              onPressed: () => pilotKirala(
+                                context,
+                                isim,
+                                ucret,
+                                lisansSeviye,
+                                il,
+                              ),
                               icon: const Icon(
                                 Icons.check_circle_outline,
                                 size: 16,

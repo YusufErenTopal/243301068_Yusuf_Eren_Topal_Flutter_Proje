@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'musteri_profil_ekrani.dart';
 import 'musteri_pilot_ekrani.dart';
-import 'musteri_odeme_ekrani.dart'; // Yeni ekranı bağladık
+import 'musteri_odeme_ekrani.dart';
 
 class MusteriAnaEkrani extends StatefulWidget {
   final String uid;
@@ -13,17 +13,22 @@ class MusteriAnaEkrani extends StatefulWidget {
 }
 
 class _MusteriAnaEkraniState extends State<MusteriAnaEkrani> {
-  int _secilenSekme = 0; // 0: Dronelar, 1: Pilotlar, 2: Sepetim, 3: Profilim
+  int _secilenSekme = 0;
 
-  void droneKirala(String droneModel, int gunlukUcret) async {
+  void droneKirala(
+    String droneModel,
+    int gunlukUcret,
+    int gerekenLisans,
+  ) async {
     try {
       await FirebaseFirestore.instance.collection('rezervasyonlar').add({
         'kullanici_id': widget.uid,
         'kiralanan_tur': 'Drone',
         'drone_model': droneModel,
         'toplam_maliyet': gunlukUcret,
+        'gereken_lisans_seviyesi': gerekenLisans,
         'tarih': FieldValue.serverTimestamp(),
-        'durum': 'Beklemede', // Ödeme ekranına düşmesi için Beklemede kalıyor
+        'durum': 'Beklemede',
       });
 
       if (mounted) {
@@ -43,11 +48,18 @@ class _MusteriAnaEkraniState extends State<MusteriAnaEkrani> {
     }
   }
 
+  String lisansMetniGetir(int? seviye) {
+    if (seviye == 1) return "İHA-0 ";
+    if (seviye == 2) return "İHA-1 ";
+    if (seviye == 3) return "İHA-2 ";
+    if (seviye == 4) return "İHA-3 ";
+    return "Belirtilmemiş (İHA-1)";
+  }
+
   @override
   Widget build(BuildContext context) {
-    // 4 SEKMELİ YENİ LİSTE DÜZENİ
     final List<Widget> _sayfalar = [
-      // SEKME 0: DRONELAR LİSTESİ
+      // SEKME 0: GÜNCELLENEN DRONELAR LİSTESİ
       StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('dronelar')
@@ -58,7 +70,12 @@ class _MusteriAnaEkraniState extends State<MusteriAnaEkrani> {
             return const Center(child: CircularProgressIndicator());
           final docs = snapshot.data!.docs;
           if (docs.isEmpty)
-            return const Center(child: Text("Müsait drone bulunmuyor."));
+            return const Center(
+              child: Text(
+                "Müsait drone bulunmuyor.",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            );
 
           return ListView.builder(
             padding: const EdgeInsets.all(12.0),
@@ -69,6 +86,7 @@ class _MusteriAnaEkraniState extends State<MusteriAnaEkrani> {
               final String model = drone['model'] ?? "";
               final int ucret = drone['gunluk_ucret'] ?? 0;
               final String fotoUrl = drone['foto_url'] ?? "";
+              final int gerekenLisans = drone['gereken_lisans_seviyesi'] ?? 2;
 
               return Card(
                 elevation: 3,
@@ -110,6 +128,15 @@ class _MusteriAnaEkraniState extends State<MusteriAnaEkrani> {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
+                            const SizedBox(height: 4),
+                            Text(
+                              "Gereken Lisans: ${lisansMetniGetir(gerekenLisans)}",
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey.shade700,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                             const SizedBox(height: 6),
                             Text(
                               "$ucret TL / Günlük",
@@ -125,8 +152,11 @@ class _MusteriAnaEkraniState extends State<MusteriAnaEkrani> {
                                 backgroundColor: Colors.blue.shade600,
                                 foregroundColor: Colors.white,
                               ),
-                              onPressed: () =>
-                                  droneKirala("$marka $model", ucret),
+                              onPressed: () => droneKirala(
+                                "$marka $model",
+                                ucret,
+                                gerekenLisans,
+                              ),
                               child: const Text("Sepete Ekle"),
                             ),
                           ],
@@ -141,36 +171,48 @@ class _MusteriAnaEkraniState extends State<MusteriAnaEkrani> {
         },
       ),
 
-      // SEKME 1: PİLOTLAR SAYFASI
       MusteriPilotEkrani(uid: widget.uid),
-
-      // SEKME 2: YENİ ÖDEME VE SEPET SAYFASI (Profilin Solu)
       MusteriOdemeEkrani(uid: widget.uid),
-
       MusteriProfilEkrani(uid: widget.uid),
     ];
 
     final List<String> _basliklar = [
       "Kiralık Dronelar",
       "Uzman Pilotlarımız",
-      "Yemeksepeti Ödeme Sistemi",
+      "Ödeme Yeri",
       "Profil Özeti",
     ];
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      // Arka plan resminin tam oturması için Scaffold'un kendi rengini transparan yapıyoruz
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: Text(
           _basliklar[_secilenSekme],
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
-        backgroundColor: Colors.blue.shade100,
+        // AppBar'ı hafif şeffaf yaparak arkadaki resimle bütünleştiriyoruz
+        backgroundColor: Colors.blue.shade100.withOpacity(0.85),
         elevation: 0,
       ),
-      body: _sayfalar[_secilenSekme],
-
-      // 4 SEKMELİ BOTTOM NAV BAR
+      // ENTEGRESYON NOKTASI: İnternetten resmi çeken ve sayfaları üzerine basan Container
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            // İSTEDİĞİN GİBİ: İnternet üzerinden dinamik çekilen resim URL'si
+            image: NetworkImage(
+              "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTtZEf5wGLkLSRs7R9Oo6yTM1TDtylTcEgUIA&s",
+            ),
+            fit: BoxFit.cover,
+            opacity:
+                0.25, // Kartlardaki yazıların rahat okunması için resmi arkada %25 opaklıkta tutuyoruz
+          ),
+        ),
+        child: _sayfalar[_secilenSekme],
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _secilenSekme,
         onTap: (index) {
@@ -192,7 +234,6 @@ class _MusteriAnaEkraniState extends State<MusteriAnaEkrani> {
             activeIcon: Icon(Icons.supervisor_account),
             label: "Pilotlar",
           ),
-          // YENİ ÖDEME İKONU (Profilin solunda)
           BottomNavigationBarItem(
             icon: Icon(Icons.shopping_bag_outlined),
             activeIcon: Icon(Icons.shopping_bag),
